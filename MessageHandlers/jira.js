@@ -1,4 +1,4 @@
-const request = require("request");
+const request = require("request-promise-native");
 module.exports = async (message, rtm) => {
     if ( message.text ) {
         const tickets = message.text.match(/(!WEMO-[0-9])\w+/g);
@@ -15,6 +15,7 @@ module.exports = async (message, rtm) => {
                     `;
                 rtm.sendMessage(issueInfo, message.channel)
             } catch (e) {
+                rtm.sendMessage("Cannot connect to JIRA", message.channel)
                 return;
             }
         }
@@ -30,27 +31,23 @@ const getIssueInfo = async ticket => {
     return new Promise(async (resolve, reject) => {
         try {
             const ticketURL = jiraURL + ticket + "?fields=" + fields;
-            request({
+            const response = await request({
                     url: ticketURL,
                     qs: {fields: fields},
                     method: "GET",
                     headers: {
                         'Authorization': "Basic " + credentials
                     }
-            }, (err, response, body) => {
-                if (err) {
-                    console.log("ERROR")
-                    console.log(err)
-                }
-                let data = JSON.parse(body);
-                resolve({
-                    status: data.fields.status.name,
-                    description: data.fields.summary,
-                    assignee: data.fields.assignee.name,
-                    link: data.self
-                });
+            });
+            const ticketData = JSON.parse(response);
+            resolve({
+                status: ticketData.fields.status.name,
+                description: ticketData.fields.summary,
+                assignee: ticketData.fields.assignee.name,
+                link: ticketData.self
             });
         } catch (err) {
+            console.error(err);
             reject(err);
         }
     });
